@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from routes.question_routes import router as question_router
 
 app = FastAPI(title="Backend API", version="1.0.0")
 
@@ -11,6 +12,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Include routers
+app.include_router(question_router)
 
 @app.get("/")
 async def root():
