@@ -6,7 +6,7 @@ class QuestionController:
     def __init__(self):
         self.gemini_client = GeminiClient()
     
-    async def generate_questions(self, topic: str, number_questions: int) -> Dict[str, List[Dict[str, Any]]]:
+    async def generate_questions(self, topic: str, number_questions: int, difficulty: str) -> Dict[str, List[Dict[str, Any]]]:
         """
         Generate questions for a given topic
         
@@ -33,7 +33,7 @@ class QuestionController:
         
         try:
             # Generate questions using Gemini
-            questions = self.gemini_client.generate_questions(topic, number_questions)
+            questions = self.gemini_client.generate_questions(topic, number_questions, difficulty)
             
             # Validate that we got the expected number of questions
             if len(questions) != number_questions:
@@ -72,7 +72,7 @@ class QuestionController:
         Returns:
             bool: True if valid, False otherwise
         """
-        required_fields = ["question", "options", "answer"]
+        required_fields = ["question", "options", "answers", "explanation"]
         
         # Check if all required fields are present
         for field in required_fields:
@@ -92,10 +92,15 @@ class QuestionController:
             if not isinstance(option, str) or not option.strip():
                 return False
         
-        # Check if answer is a non-empty string and exists in options
-        if (not isinstance(question["answer"], str) or 
-            not question["answer"].strip() or 
-            question["answer"] not in question["options"]):
+        # Check if answers is a non-empty list and all exist in options
+        if not isinstance(question["answers"], list) or len(question["answers"]) == 0:
+            return False
+        for ans in question["answers"]:
+            if (not isinstance(ans, str) or not ans.strip() or ans not in question["options"]):
+                return False
+
+        # Explanation must be a non-empty string
+        if not isinstance(question["explanation"], str) or not question["explanation"].strip():
             return False
         
         return True

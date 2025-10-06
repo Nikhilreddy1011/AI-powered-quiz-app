@@ -4,12 +4,14 @@ import './QuestionGenerator.css';
 interface Question {
   question: string;
   options: string[];
-  answer: string;
+  answers: string[];
+  explanation: string;
 }
 
 interface GenerateQuestionsRequest {
   topic: string;
   number_questions: number;
+  difficulty: 'easy' | 'medium' | 'hard';
 }
 
 interface GenerateQuestionsResponse {
@@ -19,10 +21,11 @@ interface GenerateQuestionsResponse {
 const QuestionGenerator: React.FC = () => {
   const [topic, setTopic] = useState<string>('');
   const [numberQuestions, setNumberQuestions] = useState<number>(5);
+  const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard'>('easy');
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
-  const [selectedAnswers, setSelectedAnswers] = useState<{ [key: number]: string }>({});
+  const [selectedAnswers, setSelectedAnswers] = useState<{ [key: number]: string[] }>({});
   const [showResults, setShowResults] = useState<boolean>(false);
 
   const generateQuestions = async () => {
@@ -40,7 +43,8 @@ const QuestionGenerator: React.FC = () => {
     try {
       const request: GenerateQuestionsRequest = {
         topic: topic.trim(),
-        number_questions: numberQuestions
+        number_questions: numberQuestions,
+        difficulty,
       };
 
       const response = await fetch('http://localhost:8000/api/generate-questions', {
@@ -65,11 +69,18 @@ const QuestionGenerator: React.FC = () => {
     }
   };
 
-  const handleAnswerSelect = (questionIndex: number, answer: string) => {
-    setSelectedAnswers(prev => ({
-      ...prev,
-      [questionIndex]: answer
-    }));
+  const handleAnswerSelect = (questionIndex: number, answer: string, isMulti: boolean) => {
+    setSelectedAnswers(prev => {
+      const current = prev[questionIndex] || [];
+      if (isMulti) {
+        // toggle selection
+        const exists = current.includes(answer);
+        const next = exists ? current.filter(a => a !== answer) : [...current, answer];
+        return { ...prev, [questionIndex]: next };
+      } else {
+        return { ...prev, [questionIndex]: [answer] };
+      }
+    });
   };
 
   const checkAnswers = () => {
@@ -84,13 +95,26 @@ const QuestionGenerator: React.FC = () => {
   };
 
   const getScore = () => {
-    let correct = 0;
+    // New formula: (CorrectlySelected / TotalCorrect) - (IncorrectlySelected / TotalOptions), clamped to [0, 1] per question
+    let total = 0;
     questions.forEach((question, index) => {
-      if (selectedAnswers[index] === question.answer) {
-        correct++;
-      }
+      const selected = new Set((selectedAnswers[index] || []).map(s => s.trim()));
+      const correctSet = new Set(question.answers.map(s => s.trim()));
+      const totalCorrect = correctSet.size;
+      const totalOptions = question.options.length;
+
+      let correctlySelected = 0;
+      let incorrectlySelected = 0;
+      Array.from(selected).forEach(ans => {
+        if (correctSet.has(ans)) correctlySelected += 1; else incorrectlySelected += 1;
+      });
+
+      const gain = totalCorrect > 0 ? correctlySelected / totalCorrect : 0;
+      const penalty = totalOptions > 0 ? incorrectlySelected / totalOptions : 0;
+      const normalized = Math.max(0, Math.min(1, gain - penalty));
+      total += normalized;
     });
-    return correct;
+    return total;
   };
 
   return (
@@ -123,6 +147,20 @@ const QuestionGenerator: React.FC = () => {
           </select>
         </div>
 
+        <div className="form-group">
+          <label htmlFor="difficulty">Difficulty:</label>
+          <select
+            id="difficulty"
+            value={difficulty}
+            onChange={(e) => setDifficulty(e.target.value as 'easy' | 'medium' | 'hard')}
+            className="number-select"
+          >
+            {['easy', 'medium', 'hard'].map(level => (
+              <option key={level} value={level}>{level}</option>
+            ))}
+          </select>
+        </div>
+
         <button 
           onClick={generateQuestions} 
           disabled={loading || !topic.trim()}
@@ -139,11 +177,6 @@ const QuestionGenerator: React.FC = () => {
           <div className="questions-header">
             <h3>Generated Questions</h3>
             <div className="questions-actions">
-              {!showResults && (
-                <button onClick={checkAnswers} className="check-btn">
-                  Check Answers
-                </button>
-              )}
               <button onClick={resetQuiz} className="reset-btn">
                 Generate New Questions
               </button>
@@ -157,9 +190,11 @@ const QuestionGenerator: React.FC = () => {
               
               <div className="options">
                 {question.options.map((option, optionIndex) => {
-                  const isSelected = selectedAnswers[index] === option;
-                  const isCorrect = option === question.answer;
+                  const selectedForQ = selectedAnswers[index] || [];
+                  const isSelected = selectedForQ.includes(option);
+                  const isCorrect = question.answers.includes(option);
                   const isWrong = isSelected && !isCorrect && showResults;
+                  const isMulti = question.answers.length > 1;
                   
                   return (
                     <label 
@@ -167,11 +202,11 @@ const QuestionGenerator: React.FC = () => {
                       className={`option ${isSelected ? 'selected' : ''} ${showResults ? (isCorrect ? 'correct' : isWrong ? 'wrong' : '') : ''}`}
                     >
                       <input
-                        type="radio"
+                        type={isMulti ? 'checkbox' : 'radio'}
                         name={`question-${index}`}
                         value={option}
                         checked={isSelected}
-                        onChange={() => handleAnswerSelect(index, option)}
+                        onChange={() => handleAnswerSelect(index, option, isMulti)}
                         disabled={showResults}
                       />
                       <span className="option-text">{option}</span>
@@ -182,23 +217,56 @@ const QuestionGenerator: React.FC = () => {
 
               {showResults && (
                 <div className="answer-feedback">
-                  <p className={`feedback ${selectedAnswers[index] === question.answer ? 'correct' : 'incorrect'}`}>
-                    {selectedAnswers[index] === question.answer 
-                      ? '✓ Correct!' 
-                      : `✗ Incorrect. The correct answer is: ${question.answer}`
-                    }
-                  </p>
+                  {(() => {
+                    const selected = new Set((selectedAnswers[index] || []).map(s => s.trim()));
+                    const correctSet = new Set(question.answers.map(s => s.trim()));
+                    const totalCorrect = correctSet.size;
+                    const totalOptions = question.options.length;
+                    let correctSelected = 0;
+                    let incorrectSelected = 0;
+                    Array.from(selected).forEach(ans => {
+                      if (correctSet.has(ans)) correctSelected += 1; else incorrectSelected += 1;
+                    });
+                    const gain = totalCorrect > 0 ? correctSelected / totalCorrect : 0;
+                    const penalty = totalOptions > 0 ? incorrectSelected / totalOptions : 0;
+                    const normalized = Math.max(0, Math.min(1, gain - penalty));
+                    const cls = normalized === 1 ? 'correct' : (normalized === 0 ? 'incorrect' : '');
+                    const indicator = normalized === 1 ? '✓ Correct' : (normalized === 0 ? '✗ Incorrect' : '◐ Partially correct');
+                    return (
+                      <>
+                        <p className={`feedback ${cls}`}>{indicator}</p>
+                        <p className="feedback" style={{ marginTop: 8 }}>Explanation: {question.explanation}</p>
+                      </>
+                    );
+                  })()}
                 </div>
               )}
             </div>
           ))}
+
+          {!showResults && (
+            (() => {
+              const allAnswered = questions.every((_, idx) => (selectedAnswers[idx] || []).length > 0);
+              return (
+                <div className="questions-actions" style={{ marginTop: 16 }}>
+                  <button 
+                    onClick={checkAnswers} 
+                    className="check-btn"
+                    disabled={!allAnswered}
+                  >
+                    Submit
+                  </button>
+                </div>
+              );
+            })()
+          )}
 
           {showResults && (
             <div className="score-section">
               <h3>Quiz Results</h3>
               <div className="score-display">
                 <span className="score">
-                  {getScore()} / {questions.length}
+                  {getScore().toFixed(2)} / {questions.length}
                 </span>
                 <span className="percentage">
                   ({Math.round((getScore() / questions.length) * 100)}%)
@@ -223,5 +291,6 @@ const QuestionGenerator: React.FC = () => {
 };
 
 export default QuestionGenerator;
+
 
 

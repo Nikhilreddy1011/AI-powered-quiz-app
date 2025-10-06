@@ -8,7 +8,7 @@ class GeminiClient:
         self.api_key = "AIzaSyDbgoBre0lgxaSfNyPQPJrhChnKr2EA6_0"  # In production, use environment variable
         self.base_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
     
-    def generate_questions(self, topic: str, number_questions: int) -> List[Dict[str, Any]]:
+    def generate_questions(self, topic: str, number_questions: int, difficulty: str) -> List[Dict[str, Any]]:
         """
         Generate questions using Gemini LLM
         
@@ -22,20 +22,23 @@ class GeminiClient:
         
         prompt = f"""
         Generate {number_questions} multiple choice questions about the topic: "{topic}".
+        Difficulty level: {difficulty}.
         
         Requirements:
-        1. Each question should have exactly 4 options (labeled A, B, C, D)
-        2. Only one option should be correct
-        3. Questions should be educational and appropriate
-        4. Provide the correct answer for each question
+        1. Each question should have exactly 4 options.
+        2. Some questions should have multiple correct answers (2-3). Others can have exactly one.
+        3. Include a short 1-2 sentence explanation for the correct answer(s).
+        4. Questions should be educational and appropriate.
+        5. For multiple-answer questions, make sure answers contain ALL correct options.
         
-        Please respond in the following JSON format:
+        Respond ONLY with valid JSON in the following format (no markdown, no extra text):
         {{
             "questions": [
                 {{
                     "question": "Your question here?",
                     "options": ["Option A", "Option B", "Option C", "Option D"],
-                    "answer": "Option A"
+                    "answers": ["Option A"],  
+                    "explanation": "Why the answer(s) are correct in 1-2 sentences."
                 }}
             ]
         }}

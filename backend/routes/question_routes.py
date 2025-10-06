@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Literal, Union
 from controllers.question_controller import QuestionController
 
 # Create router
@@ -13,12 +13,16 @@ question_controller = QuestionController()
 class GenerateQuestionsRequest(BaseModel):
     topic: str = Field(..., min_length=1, max_length=200, description="Topic for question generation")
     number_questions: int = Field(..., ge=1, le=50, description="Number of questions to generate")
+    difficulty: Literal["easy", "medium", "hard"] = Field(
+        ..., description="Difficulty level for the quiz"
+    )
 
 # Response models
 class Question(BaseModel):
     question: str
     options: List[str]
-    answer: str
+    answers: List[str]
+    explanation: str
 
 class GenerateQuestionsResponse(BaseModel):
     questions: List[Question]
@@ -40,7 +44,8 @@ async def generate_questions(request: GenerateQuestionsRequest):
     try:
         result = await question_controller.generate_questions(
             topic=request.topic,
-            number_questions=request.number_questions
+            number_questions=request.number_questions,
+            difficulty=request.difficulty
         )
         return result
     except HTTPException:
