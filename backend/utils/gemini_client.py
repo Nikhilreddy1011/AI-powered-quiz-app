@@ -2,10 +2,15 @@ import requests
 import json
 import os
 from typing import List, Dict, Any
+from dotenv import load_dotenv
+
+load_dotenv()
 
 class GeminiClient:
     def __init__(self):
-        self.api_key = "AIzaSyDbgoBre0lgxaSfNyPQPJrhChnKr2EA6_0"  # In production, use environment variable
+        self.api_key = os.getenv("GEMINI_API_KEY")
+        if not self.api_key:
+            raise ValueError("GEMINI_API_KEY is not set. Please define it in your environment or .env file.")
         self.base_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
     
     def generate_questions(self, topic: str, number_questions: int, difficulty: str) -> List[Dict[str, Any]]:
