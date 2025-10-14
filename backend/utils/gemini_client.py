@@ -1,105 +1,83 @@
-import requests
-import json
 import os
 from typing import List, Dict, Any
 from dotenv import load_dotenv
+from pydantic import BaseModel, Field
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_core.prompts import ChatPromptTemplate
 
 load_dotenv()
 
+
+class QuestionModel(BaseModel):
+    question: str = Field(..., description="The question text")
+    options: List[str] = Field(..., description="Exactly 4 options")
+    answers: List[str] = Field(..., description="One or more correct options, each must be in options")
+    explanation: str = Field(..., description="1-2 sentence rationale for the answer(s)")
+
+
+class QuestionsResponse(BaseModel):
+    questions: List[QuestionModel]
+
+
 class GeminiClient:
     def __init__(self):
-        self.api_key = os.getenv("GEMINI_API_KEY")
+        self.api_key = os.getenv("GOOGLE_API_KEY")
         if not self.api_key:
-            raise ValueError("GEMINI_API_KEY is not set. Please define it in your environment or .env file.")
-        self.base_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
-    
+            raise ValueError("GOOGLE_API_KEY is not set. Please define it in your environment or .env file.")
+
+        # Chat model from LangChain's Google GenAI integration
+        self.llm = ChatGoogleGenerativeAI(
+            model="gemini-2.0-flash",
+            api_key=self.api_key,
+            temperature=0.4,
+        )
+
+        # Prompt that strictly defines the structure and constraints
+        self.prompt = ChatPromptTemplate.from_messages([
+            ("system", (
+                "You create high-quality multiple-choice questions. "
+                "Always follow the requested structure and constraints."
+            )),
+            ("human", (
+                "Generate {number_questions} multiple-choice question objects for topic: '{topic}'.\n"
+                "Difficulty: {difficulty}.\n\n"
+                "Constraints:\n"
+                "- Each question must have exactly 4 options.\n"
+                "- Some questions should have multiple correct answers (2-3); others may have exactly one.\n"
+                "- Include a concise 1-2 sentence explanation for the correct answer(s).\n"
+                "- Keep content educational and appropriate.\n"
+                "- If multiple answers are correct, ensure 'answers' includes ALL correct options exactly as in 'options'.\n"
+                "Return only structured data, no markdown."
+            )),
+        ])
+
+        # Force the model to return Pydantic-validated structure
+        self.structured_llm = self.llm.with_structured_output(QuestionsResponse)
+
     def generate_questions(self, topic: str, number_questions: int, difficulty: str) -> List[Dict[str, Any]]:
         """
-        Generate questions using Gemini LLM
-        
+        Generate questions using Gemini via LangChain with Pydantic-validated structured output.
+
         Args:
-            topic (str): The topic for question generation
-            number_questions (int): Number of questions to generate
-            
+            topic: The topic for question generation
+            number_questions: Number of questions to generate
+            difficulty: Difficulty level (e.g., easy, medium, hard)
+
         Returns:
-            List[Dict]: List of generated questions with options and answers
+            List[Dict[str, Any]]: List of question dicts with keys: question, options, answers, explanation
         """
-        
-        prompt = f"""
-        Generate {number_questions} multiple choice questions about the topic: "{topic}".
-        Difficulty level: {difficulty}.
-        
-        Requirements:
-        1. Each question should have exactly 4 options.
-        2. Some questions should have multiple correct answers (2-3). Others can have exactly one.
-        3. Include a short 1-2 sentence explanation for the correct answer(s).
-        4. Questions should be educational and appropriate.
-        5. For multiple-answer questions, make sure answers contain ALL correct options.
-        
-        Respond ONLY with valid JSON in the following format (no markdown, no extra text):
-        {{
-            "questions": [
-                {{
-                    "question": "Your question here?",
-                    "options": ["Option A", "Option B", "Option C", "Option D"],
-                    "answers": ["Option A"],  
-                    "explanation": "Why the answer(s) are correct in 1-2 sentences."
-                }}
-            ]
-        }}
-        
-        Generate exactly {number_questions} questions.
-        """
-        
-        payload = {
-            "contents": [
-                {
-                    "parts": [
-                        {
-                            "text": prompt
-                        }
-                    ]
-                }
-            ]
-        }
-        
-        headers = {
-            'X-goog-api-key': self.api_key,
-            'Content-Type': 'application/json'
-        }
-        
+
+        chain = self.prompt | self.structured_llm
+
         try:
-            response = requests.post(
-                self.base_url, 
-                headers=headers, 
-                json=payload,
-                timeout=30
-            )
-            response.raise_for_status()
-            
-            # Parse the response
-            result = response.json()
-            
-            # Extract the generated text from Gemini response
-            if 'candidates' in result and len(result['candidates']) > 0:
-                generated_text = result['candidates'][0]['content']['parts'][0]['text']
-                
-                # Clean up the response to extract JSON
-                # Remove markdown code blocks if present
-                if '```json' in generated_text:
-                    generated_text = generated_text.split('```json')[1].split('```')[0]
-                elif '```' in generated_text:
-                    generated_text = generated_text.split('```')[1].split('```')[0]
-                
-                # Parse the JSON response
-                questions_data = json.loads(generated_text.strip())
-                return questions_data.get('questions', [])
-            else:
-                raise Exception("No content generated by Gemini")
-                
-        except requests.exceptions.RequestException as e:
-            raise Exception(f"Request failed: {str(e)}")
-        except json.JSONDecodeError as e:
-            raise Exception(f"Failed to parse JSON response: {str(e)}")
+            result: QuestionsResponse = chain.invoke({
+                "topic": topic,
+                "number_questions": number_questions,
+                "difficulty": difficulty,
+            })
+
+            # Convert Pydantic models to plain dicts
+            return [q.model_dump() for q in result.questions]
         except Exception as e:
+            # Surface a concise error upward to controller
             raise Exception(f"Error generating questions: {str(e)}")
