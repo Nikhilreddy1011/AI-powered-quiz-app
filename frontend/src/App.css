@@ -10,7 +10,7 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #f7fafc;
   min-height: 100vh;
   color: #2c3e50;
 }
@@ -19,6 +19,13 @@ body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+}
+
+.quiz-page {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 }
 
 .app-header {
