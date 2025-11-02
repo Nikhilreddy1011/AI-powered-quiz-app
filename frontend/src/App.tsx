@@ -7,6 +7,8 @@ import Hero from './components/Hero';
 import Login from './components/Auth/Login';
 import Register from './components/Auth/Register';
 import QuestionGenerator from './components/QuestionGenerator';
+import Dashboard from './components/Dashboard/Dashboard';
+import Profile from './components/Profile/Profile';
 import ProtectedRoute from './components/ProtectedRoute';
 import PublicRoute from './components/PublicRoute';
 
@@ -27,6 +29,24 @@ function App() {
             />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            
+            {/* Protected Routes */}
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/profile"
+              element={
+                <ProtectedRoute>
+                  <Profile />
+                </ProtectedRoute>
+              }
+            />
             <Route
               path="/quiz"
               element={
@@ -39,6 +59,7 @@ function App() {
                 </ProtectedRoute>
               }
             />
+            
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </div>

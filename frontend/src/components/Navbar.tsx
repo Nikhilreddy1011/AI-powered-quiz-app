@@ -10,14 +10,20 @@ const Navbar: React.FC = () => {
   return (
     <nav className="navbar">
       <div className="navbar-container">
-        <Link to={isAuthenticated ? "/quiz" : "/"} className="navbar-logo">
+        <Link to={isAuthenticated ? "/dashboard" : "/"} className="navbar-logo">
           <span className="logo-icon">🎯</span>
-          Quiz Generator
+          QuizMind
         </Link>
 
         <div className="navbar-menu">
           {isAuthenticated ? (
-            <UserMenu />
+            <>
+              <Link to="/dashboard" className="navbar-link">
+                <span className="nav-icon">📊</span>
+                Dashboard
+              </Link>
+              <UserMenu />
+            </>
           ) : (
             <>
               <Link to="/login" className="navbar-button">

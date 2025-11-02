@@ -88,6 +88,18 @@ const UserMenu: React.FC = () => {
 
           <div className="user-dropdown-divider"></div>
 
+          <div className="user-dropdown-menu">
+            <button 
+              className="menu-item" 
+              onClick={() => { navigate('/profile'); setIsOpen(false); }}
+            >
+              <span className="menu-icon">👤</span>
+              My Profile
+            </button>
+          </div>
+
+          <div className="user-dropdown-divider"></div>
+
           <div className="user-dropdown-footer">
             <button 
               className="logout-button" 
