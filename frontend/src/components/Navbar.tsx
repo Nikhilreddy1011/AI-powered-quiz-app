@@ -12,7 +12,7 @@ const Navbar: React.FC = () => {
       <div className="navbar-container">
         <Link to={isAuthenticated ? "/dashboard" : "/"} className="navbar-logo">
           <span className="logo-icon">🎯</span>
-          QuizMind
+          Quizly
         </Link>
 
         <div className="navbar-menu">

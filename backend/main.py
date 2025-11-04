@@ -6,7 +6,7 @@ from routes.dashboard import router as dashboard_router
 from routes.profile import router as profile_router
 from database import create_tables
 
-app = FastAPI(title="QuizMind API", version="2.0.0", description="AI-Powered Quiz Platform")
+app = FastAPI(title="Quizly API", version="2.0.0", description="AI-Powered Quiz Platform")
 
 # Create database tables
 create_tables()
