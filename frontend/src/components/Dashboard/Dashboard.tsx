@@ -341,7 +341,7 @@ const Dashboard: React.FC = () => {
             <table className="quiz-table">
               <thead>
                 <tr>
-                  <th>Topic / Category</th>
+                  <th>Topic</th>
                   <th>Date</th>
                   <th>Difficulty</th>
                   <th>Score</th>
@@ -356,8 +356,7 @@ const Dashboard: React.FC = () => {
                     <td className="quiz-topic">
                       <div className="topic-cell">
                         <div className="topic-info">
-                          <span className="topic-name">{quiz.subcategory}</span>
-                          <span className="topic-category">{quiz.category}</span>
+                          <span className="topic-name">{quiz.subcategory.toUpperCase()}</span>
                         </div>
                       </div>
                     </td>
@@ -375,7 +374,7 @@ const Dashboard: React.FC = () => {
                     </td>
                     <td className="quiz-score">
                       <span className="progress-indicator">
-                        {quiz.current_question}/{quiz.total_questions}
+                        -
                       </span>
                     </td>
                     <td className="quiz-status">
