@@ -73,20 +73,42 @@ const QuestionGenerator: React.FC = () => {
     return () => clearInterval(timerInterval);
   }, [showQuiz, showResults, quizStartTime, initialTimeOffset]);
 
-  // Save on page unload
+  // Save on page unload or navigation
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (showQuiz && !showResults) {
-        saveQuizState();
+      if (showQuiz && !showResults && questions.length > 0) {
+        // Use synchronous approach for reliability
+        const token = authService.getToken();
+        if (!token) return;
+
+        const currentSessionTime = quizStartTime ? Math.floor((Date.now() - quizStartTime) / 1000) : 0;
+        const totalTimeTaken = initialTimeOffset + currentSessionTime;
+
+        const quizData = {
+          quiz_id: quizId,
+          topic: topic,
+          difficulty: difficulty,
+          total_questions: questions.length,
+          current_question_index: currentQuestion,
+          questions_data: questions,
+          user_answers: selectedAnswers,
+          time_taken: totalTimeTaken
+        };
+
+        // Use sendBeacon for reliable async save on unload
+        const blob = new Blob([JSON.stringify(quizData)], { type: 'application/json' });
+        navigator.sendBeacon(`http://localhost:8000/dashboard/save-state?token=${token}`, blob);
+        
+        // Show confirmation dialog
         e.preventDefault();
-        e.returnValue = '';
+        e.returnValue = 'Your quiz progress will be saved. You can resume it later from the dashboard.';
       }
     };
 
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showQuiz, showResults]);
+  }, [showQuiz, showResults, questions, quizStartTime, initialTimeOffset, quizId, topic, difficulty, currentQuestion, selectedAnswers]);
 
   const loadQuizState = async (resumeQuizId: number) => {
     try {
@@ -214,18 +236,13 @@ const QuestionGenerator: React.FC = () => {
     });
   };
 
-  const resetQuiz = () => {
-    setQuestions([]);
-    setSelectedAnswers({});
-    setShowResults(false);
-    setError('');
-    setShowQuiz(false);
-    setCurrentQuestion(0);
-    setQuizStartTime(null);
-    setQuizEndTime(null);
-    setQuizId(null);
-    setInitialTimeOffset(0);
-    setElapsedTime(0);
+  const handleCloseQuiz = async () => {
+    // Save quiz progress before closing
+    if (showQuiz && !showResults && questions.length > 0) {
+      await saveQuizState();
+    }
+    // Navigate to dashboard
+    navigate('/dashboard');
   };
 
   const nextQuestion = () => {
@@ -436,7 +453,7 @@ const QuestionGenerator: React.FC = () => {
                   <div className="quiz-timer">
                     ⏱️ {formatTime(elapsedTime)}
                   </div>
-                  <button onClick={resetQuiz} className="exit-btn" title="Exit Quiz">
+                  <button onClick={handleCloseQuiz} className="exit-btn" title="Save & Exit Quiz">
                     ✕
                   </button>
                 </div>
@@ -646,6 +663,3 @@ const QuestionGenerator: React.FC = () => {
 };
 
 export default QuestionGenerator;
-
-
-

@@ -341,7 +341,7 @@ const Dashboard: React.FC = () => {
             <table className="quiz-table">
               <thead>
                 <tr>
-                  <th>Topic / Category</th>
+                  <th>Topic</th>
                   <th>Date</th>
                   <th>Difficulty</th>
                   <th>Score</th>
@@ -374,11 +374,7 @@ const Dashboard: React.FC = () => {
                         {quiz.difficulty}
                       </span>
                     </td>
-                    <td className="quiz-score">
-                      <span className="progress-indicator">
-                        {quiz.current_question}/{quiz.total_questions}
-                      </span>
-                    </td>
+                    <td className="quiz-score">-</td>
                     <td className="quiz-status">
                       <span className="status-badge status-incomplete">
                         ⏸ Incomplete
