@@ -20,7 +20,7 @@ const PublicRoute: React.FC<PublicRouteProps> = ({ children }) => {
 
   // If user is authenticated, redirect to quiz page
   if (isAuthenticated) {
-    return <Navigate to="/quiz" replace />;
+    return <Navigate to="/dashboard" replace />;
   }
 
   // Otherwise show the public content (Hero)
