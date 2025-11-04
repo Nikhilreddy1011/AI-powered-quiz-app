@@ -355,10 +355,8 @@ const Dashboard: React.FC = () => {
                   <tr key={`ongoing-${quiz.id}`} className="quiz-row incomplete-row">
                     <td className="quiz-topic">
                       <div className="topic-cell">
-                        <span className="topic-icon">{quiz.category_icon}</span>
                         <div className="topic-info">
-                          <span className="topic-name">{quiz.subcategory}</span>
-                          <span className="topic-category">{quiz.category}</span>
+                          <span className="topic-name">{quiz.subcategory.toUpperCase()}</span>
                         </div>
                       </div>
                     </td>
@@ -397,10 +395,8 @@ const Dashboard: React.FC = () => {
                   <tr key={`completed-${quiz.id}`} className="quiz-row completed-row">
                     <td className="quiz-topic">
                       <div className="topic-cell">
-                        <span className="topic-icon">{quiz.category_icon}</span>
                         <div className="topic-info">
-                          <span className="topic-name">{quiz.subcategory}</span>
-                          <span className="topic-category">{quiz.category}</span>
+                          <span className="topic-name">{quiz.subcategory.toUpperCase()}</span>
                         </div>
                       </div>
                     </td>

@@ -39,7 +39,6 @@ const QuestionGenerator: React.FC = () => {
   const [elapsedTime, setElapsedTime] = useState<number>(0);
   const [quizId, setQuizId] = useState<number | null>(null);
   const [initialTimeOffset, setInitialTimeOffset] = useState<number>(0);
-  const [timeWarningShown, setTimeWarningShown] = useState<boolean>(false);
 
   // Check for resume quiz on mount
   useEffect(() => {
@@ -71,12 +70,7 @@ const QuestionGenerator: React.FC = () => {
   useEffect(() => {
     if (!showQuiz || showResults || !quizStartTime) return;
 
-    console.log('Timer started with:', {
-      initialTimeOffset,
-      quizStartTime: new Date(quizStartTime).toISOString(),
-      questionsLength: questions.length,
-      totalTime: questions.length * 60
-    });
+    console.log('Timer started with initialTimeOffset:', initialTimeOffset);
 
     const timerInterval = setInterval(() => {
       const currentSessionTime = Math.floor((Date.now() - quizStartTime) / 1000);
@@ -85,27 +79,15 @@ const QuestionGenerator: React.FC = () => {
 
       // Check if time is up
       const totalTime = questions.length * 60;
-      const remaining = totalTime - newElapsedTime;
-      
-      // Show warning at 1 minute remaining
-      if (remaining === 60 && !timeWarningShown) {
-        setTimeWarningShown(true);
-        // You could add a toast notification here
-      }
-      
       if (newElapsedTime >= totalTime) {
         clearInterval(timerInterval);
-        // Auto-submit quiz when time runs out
         submitQuiz();
       }
     }, 1000);
 
-    return () => {
-      console.log('Timer stopped');
-      clearInterval(timerInterval);
-    };
+    return () => clearInterval(timerInterval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showQuiz, showResults, quizStartTime, initialTimeOffset, questions.length, timeWarningShown]);
+  }, [showQuiz, showResults, quizStartTime, questions.length]);
 
   // Save on page unload or navigation
   useEffect(() => {
@@ -178,7 +160,6 @@ const QuestionGenerator: React.FC = () => {
       setInitialTimeOffset(alreadyElapsed);
       setElapsedTime(alreadyElapsed);
       setQuizStartTime(Date.now());
-      setTimeWarningShown(false); // Reset warning flag
       setShowQuiz(true);
       
       console.log('Quiz state loaded successfully');
@@ -300,7 +281,6 @@ const QuestionGenerator: React.FC = () => {
       setInitialTimeOffset(0); // Reset for fresh quiz
       setElapsedTime(0);
       setQuizId(null); // No quiz ID for fresh quiz
-      setTimeWarningShown(false); // Reset warning flag
       
       // Save initial quiz state immediately
       setTimeout(() => {
@@ -578,9 +558,6 @@ const QuestionGenerator: React.FC = () => {
                       onClick={() => setCurrentQuestion(idx)}
                     ></div>
                   ))}
-                </div>
-                <div className="time-info">
-                  <span className="time-allocation">⏱️ {questions.length} questions × 1 min = {questions.length} minutes total</span>
                 </div>
               </div>
 
