@@ -61,17 +61,6 @@ const QuestionGenerator: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showQuiz, showResults, questions, currentQuestion, selectedAnswers, elapsedTime]);
 
-  // Update timer every second
-  useEffect(() => {
-    if (!showQuiz || showResults || !quizStartTime) return;
-
-    const timerInterval = setInterval(() => {
-      const currentSessionTime = Math.floor((Date.now() - quizStartTime) / 1000);
-      setElapsedTime(initialTimeOffset + currentSessionTime);
-    }, 1000);
-
-    return () => clearInterval(timerInterval);
-  }, [showQuiz, showResults, quizStartTime, initialTimeOffset]);
 
   // Save on page unload
   useEffect(() => {
@@ -214,18 +203,14 @@ const QuestionGenerator: React.FC = () => {
     });
   };
 
-  const resetQuiz = () => {
-    setQuestions([]);
-    setSelectedAnswers({});
-    setShowResults(false);
-    setError('');
-    setShowQuiz(false);
-    setCurrentQuestion(0);
-    setQuizStartTime(null);
-    setQuizEndTime(null);
-    setQuizId(null);
-    setInitialTimeOffset(0);
-    setElapsedTime(0);
+  const resetQuiz = async () => {
+    // Save progress before closing for seamless resume
+    if (showQuiz && !showResults && questions.length > 0) {
+      await saveQuizState();
+    }
+    
+    // Navigate to dashboard where quiz will appear as Incomplete
+    navigate('/dashboard');
   };
 
   const nextQuestion = () => {
@@ -243,6 +228,16 @@ const QuestionGenerator: React.FC = () => {
   const getTimeTaken = () => {
     if (!quizStartTime || !quizEndTime) return 0;
     return Math.floor((quizEndTime - quizStartTime) / 1000);
+  };
+
+  const getTotalTimeAllowed = () => {
+    return questions.length * 60; // 1 minute per question
+  };
+
+  const getRemainingTime = () => {
+    const totalTime = getTotalTimeAllowed();
+    const remaining = totalTime - elapsedTime;
+    return Math.max(0, remaining);
   };
 
   const formatTime = (seconds: number) => {
@@ -300,20 +295,26 @@ const QuestionGenerator: React.FC = () => {
     }
   };
 
-  // Timer effect
+  // Timer effect - Production-grade countdown with auto-submit
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-    
-    if (showQuiz && !showResults && quizStartTime) {
-      interval = setInterval(() => {
-        setElapsedTime(Math.floor((Date.now() - quizStartTime) / 1000));
-      }, 1000);
-    }
+    if (!showQuiz || showResults || !quizStartTime) return;
 
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [showQuiz, showResults, quizStartTime]);
+    const interval = setInterval(() => {
+      const currentSessionTime = Math.floor((Date.now() - quizStartTime) / 1000);
+      const totalElapsed = initialTimeOffset + currentSessionTime;
+      setElapsedTime(totalElapsed);
+
+      // Auto-submit when time runs out
+      const totalTimeAllowed = questions.length * 60;
+      if (totalElapsed >= totalTimeAllowed) {
+        clearInterval(interval);
+        submitQuiz();
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showQuiz, showResults, quizStartTime, initialTimeOffset, questions.length]);
 
   const getScore = () => {
     // New formula: (CorrectlySelected / TotalCorrect) - (IncorrectlySelected / TotalOptions), clamped to [0, 1] per question
@@ -433,8 +434,12 @@ const QuestionGenerator: React.FC = () => {
                   <span className="progress-text">
                     Question {currentQuestion + 1} of {questions.length}
                   </span>
-                  <div className="quiz-timer">
-                    ⏱️ {formatTime(elapsedTime)}
+                  <div className={`quiz-timer ${
+                    getRemainingTime() <= 60 ? 'timer-warning' : ''
+                  } ${
+                    getRemainingTime() <= 30 ? 'timer-critical' : ''
+                  }`}>
+                    ⏱️ {formatTime(getRemainingTime())}
                   </div>
                   <button onClick={resetQuiz} className="exit-btn" title="Exit Quiz">
                     ✕
