@@ -39,6 +39,7 @@ const QuestionGenerator: React.FC = () => {
   const [elapsedTime, setElapsedTime] = useState<number>(0);
   const [quizId, setQuizId] = useState<number | null>(null);
   const [initialTimeOffset, setInitialTimeOffset] = useState<number>(0);
+  const [timeWarningShown, setTimeWarningShown] = useState<boolean>(false);
 
   // Check for resume quiz on mount
   useEffect(() => {
@@ -51,27 +52,60 @@ const QuestionGenerator: React.FC = () => {
 
   // Auto-save every 30 seconds
   useEffect(() => {
-    if (!showQuiz || showResults || !questions.length) return;
+    if (!showQuiz || showResults || !questions.length || !quizId) return;
 
+    console.log('Auto-save timer started');
     const autoSaveInterval = setInterval(() => {
+      console.log('Auto-save triggered');
       saveQuizState();
     }, 30000); // 30 seconds
 
-    return () => clearInterval(autoSaveInterval);
+    return () => {
+      console.log('Auto-save timer cleared');
+      clearInterval(autoSaveInterval);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showQuiz, showResults, questions, currentQuestion, selectedAnswers, elapsedTime]);
+  }, [showQuiz, showResults, questions.length, quizId]);
 
-  // Update timer every second
+  // Update timer every second and auto-submit when time runs out
   useEffect(() => {
     if (!showQuiz || showResults || !quizStartTime) return;
 
+    console.log('Timer started with:', {
+      initialTimeOffset,
+      quizStartTime: new Date(quizStartTime).toISOString(),
+      questionsLength: questions.length,
+      totalTime: questions.length * 60
+    });
+
     const timerInterval = setInterval(() => {
       const currentSessionTime = Math.floor((Date.now() - quizStartTime) / 1000);
-      setElapsedTime(initialTimeOffset + currentSessionTime);
+      const newElapsedTime = initialTimeOffset + currentSessionTime;
+      setElapsedTime(newElapsedTime);
+
+      // Check if time is up
+      const totalTime = questions.length * 60;
+      const remaining = totalTime - newElapsedTime;
+      
+      // Show warning at 1 minute remaining
+      if (remaining === 60 && !timeWarningShown) {
+        setTimeWarningShown(true);
+        // You could add a toast notification here
+      }
+      
+      if (newElapsedTime >= totalTime) {
+        clearInterval(timerInterval);
+        // Auto-submit quiz when time runs out
+        submitQuiz();
+      }
     }, 1000);
 
-    return () => clearInterval(timerInterval);
-  }, [showQuiz, showResults, quizStartTime, initialTimeOffset]);
+    return () => {
+      console.log('Timer stopped');
+      clearInterval(timerInterval);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showQuiz, showResults, quizStartTime, initialTimeOffset, questions.length, timeWarningShown]);
 
   // Save on page unload or navigation
   useEffect(() => {
@@ -122,6 +156,17 @@ const QuestionGenerator: React.FC = () => {
       
       // Store the already elapsed time from previous sessions
       const alreadyElapsed = data.time_taken || 0;
+      const totalTime = (data.questions_data?.length || 0) * 60;
+      const remainingTime = totalTime - alreadyElapsed;
+      
+      console.log('Resume quiz:', {
+        quiz_id: data.quiz_id,
+        total_questions: data.questions_data?.length,
+        current_question: data.current_question_index,
+        elapsed_time: alreadyElapsed,
+        total_time: totalTime,
+        remaining_time: remainingTime
+      });
       
       setQuizId(data.quiz_id);
       setTopic(data.topic);
@@ -133,10 +178,45 @@ const QuestionGenerator: React.FC = () => {
       setInitialTimeOffset(alreadyElapsed);
       setElapsedTime(alreadyElapsed);
       setQuizStartTime(Date.now());
+      setTimeWarningShown(false); // Reset warning flag
       setShowQuiz(true);
+      
+      console.log('Quiz state loaded successfully');
     } catch (error) {
       console.error('Failed to load quiz state:', error);
       setError('Failed to resume quiz');
+    }
+  };
+
+  const saveInitialQuizState = async (questionsData: Question[]) => {
+    try {
+      const token = authService.getToken();
+      if (!token) return;
+
+      const quizData = {
+        quiz_id: null,
+        topic: topic,
+        difficulty: difficulty,
+        total_questions: questionsData.length,
+        current_question_index: 0,
+        questions_data: questionsData,
+        user_answers: {},
+        time_taken: 0
+      };
+
+      const response = await fetch(`http://localhost:8000/dashboard/save-state?token=${token}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(quizData)
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        setQuizId(result.quiz_id);
+        console.log('Initial quiz saved with ID:', result.quiz_id);
+      }
+    } catch (error) {
+      console.error('Failed to save initial quiz state:', error);
     }
   };
 
@@ -160,6 +240,8 @@ const QuestionGenerator: React.FC = () => {
         time_taken: totalTimeTaken
       };
 
+      console.log('Saving quiz state:', { quiz_id: quizId, current_question: currentQuestion, time_taken: totalTimeTaken });
+
       const response = await fetch(`http://localhost:8000/dashboard/save-state?token=${token}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -168,7 +250,10 @@ const QuestionGenerator: React.FC = () => {
 
       if (response.ok) {
         const result = await response.json();
-        if (!quizId) setQuizId(result.quiz_id);
+        if (!quizId) {
+          setQuizId(result.quiz_id);
+          console.log('Quiz ID set:', result.quiz_id);
+        }
       }
     } catch (error) {
       console.error('Failed to save quiz state:', error);
@@ -215,6 +300,12 @@ const QuestionGenerator: React.FC = () => {
       setInitialTimeOffset(0); // Reset for fresh quiz
       setElapsedTime(0);
       setQuizId(null); // No quiz ID for fresh quiz
+      setTimeWarningShown(false); // Reset warning flag
+      
+      // Save initial quiz state immediately
+      setTimeout(() => {
+        saveInitialQuizState(data.questions);
+      }, 100);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
@@ -239,7 +330,9 @@ const QuestionGenerator: React.FC = () => {
   const handleCloseQuiz = async () => {
     // Save quiz progress before closing
     if (showQuiz && !showResults && questions.length > 0) {
+      console.log('Closing quiz, saving state...');
       await saveQuizState();
+      console.log('Quiz state saved, navigating to dashboard');
     }
     // Navigate to dashboard
     navigate('/dashboard');
@@ -260,6 +353,17 @@ const QuestionGenerator: React.FC = () => {
   const getTimeTaken = () => {
     if (!quizStartTime || !quizEndTime) return 0;
     return Math.floor((quizEndTime - quizStartTime) / 1000);
+  };
+
+  const getTotalTimeAllowed = () => {
+    // 1 minute per question
+    return questions.length * 60;
+  };
+
+  const getRemainingTime = () => {
+    const totalTime = getTotalTimeAllowed();
+    const remaining = totalTime - elapsedTime;
+    return Math.max(0, remaining); // Never go below 0
   };
 
   const formatTime = (seconds: number) => {
@@ -450,8 +554,8 @@ const QuestionGenerator: React.FC = () => {
                   <span className="progress-text">
                     Question {currentQuestion + 1} of {questions.length}
                   </span>
-                  <div className="quiz-timer">
-                    ⏱️ {formatTime(elapsedTime)}
+                  <div className={`quiz-timer ${getRemainingTime() < 60 ? 'timer-warning' : getRemainingTime() < 30 ? 'timer-critical' : ''}`}>
+                    ⏱️ {formatTime(getRemainingTime())}
                   </div>
                   <button onClick={handleCloseQuiz} className="exit-btn" title="Save & Exit Quiz">
                     ✕
@@ -474,6 +578,9 @@ const QuestionGenerator: React.FC = () => {
                       onClick={() => setCurrentQuestion(idx)}
                     ></div>
                   ))}
+                </div>
+                <div className="time-info">
+                  <span className="time-allocation">⏱️ {questions.length} questions × 1 min = {questions.length} minutes total</span>
                 </div>
               </div>
 
@@ -663,3 +770,6 @@ const QuestionGenerator: React.FC = () => {
 };
 
 export default QuestionGenerator;
+
+
+
