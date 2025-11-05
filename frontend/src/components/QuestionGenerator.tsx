@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import authService from '../services/authService';
 import './QuestionGenerator.css';
@@ -39,6 +39,7 @@ const QuestionGenerator: React.FC = () => {
   const [elapsedTime, setElapsedTime] = useState<number>(0);
   const [quizId, setQuizId] = useState<number | null>(null);
   const [initialTimeOffset, setInitialTimeOffset] = useState<number>(0);
+  const submitButtonRef = useRef<HTMLButtonElement>(null);
 
   // Check for resume quiz on mount
   useEffect(() => {
@@ -308,7 +309,10 @@ const QuestionGenerator: React.FC = () => {
       const totalTimeAllowed = questions.length * 60;
       if (totalElapsed >= totalTimeAllowed) {
         clearInterval(interval);
-        submitQuiz();
+        // Programmatically click the hidden submit button
+        if (submitButtonRef.current) {
+          submitButtonRef.current.click();
+        }
       }
     }, 1000);
 
@@ -504,6 +508,14 @@ const QuestionGenerator: React.FC = () => {
                   })}
                 </div>
               </div>
+
+              {/* Hidden submit button for auto-submit */}
+              <button 
+                ref={submitButtonRef}
+                onClick={submitQuiz}
+                style={{ display: 'none' }}
+                aria-hidden="true"
+              />
 
               {/* Navigation Buttons */}
               <div className="quiz-navigation">
